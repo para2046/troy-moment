@@ -1,0 +1,70 @@
+# Experiment configuration — MODEL PLAN (config/metadata only).
+# This file carries the model roster + runtime/concurrency policy. It does NOT
+# define any scientific design: task qualification (configs/qualification_criteria.yaml),
+# A/B/C/D treatment semantics, checkpoints, metrics, and analysis hypotheses
+# (analysis_plan.md) are frozen elsewhere and are UNCHANGED by this model-set update.
+# Frozen at freeze_design; protected thereafter (no_forbidden_changes).
+
+config_version: models-v2
+
+# ---- Main six-model comparison set (the primary A/B[/C/D] comparison) -----
+main_evaluation_models:   # FINAL sprint matrix = these FOUR only (budget/runtime reduction)
+  - {name: sol,         model_id: gpt-5.6-sol,     backend: openai,            tier: closed_api}
+  - {name: fable,       model_id: claude-fable-5.1, backend: anthropic,        tier: closed_api}
+  - {name: glm,         model_id: glm-5.3-flash,    backend: openai_compatible, tier: modal_shared_endpoint}
+  - {name: qwen3_8_max, model_id: qwen3.8-max,      backend: openai_compatible, tier: modal_shared_endpoint}
+
+# Deferred / OPTIONAL follow-up models: adapters/configs retained, but NOT part of
+# the final four-model sprint matrix. Run only if substantial time/budget remains
+# after the four-model matrix, and NEVER mixed into the four-model aggregate.
+deferred_optional_models:
+  - {name: gemini, model_id: gemini-3.8-flash, backend: gemini}
+  - {name: kimi,   model_id: kimi-k3,          backend: openai_compatible}
+
+# GLM-5.3-Flash has a SEPARATE role as the qualification + checkpoint-construction
+# driver (construction_driver.yaml). That is distinct from GLM also being one of the
+# four evaluated models above.
+study_priority:   # if time/budget becomes tight; log any reduction in UPDATE_LOG BEFORE executing
+  - "1. Study A - all four models"
+  - "2. Study B - all four models"
+  - "3. Study C - all four if feasible; minimum GLM + GPT-5.6 Sol if critical"
+  - "4. Study D - prioritize GLM + GPT-5.6 Sol if full four-model D exceeds budget"
+analysis_scope: "primary cross-model comparison uses the four models ONLY; do NOT mix opportunistic deferred-model partial runs into the four-model aggregate; keep model effects explicit."
+
+
+# ---- Post-training baseline: REMOVED ------------------------------------
+# Qwen3-32B was removed from the project entirely (see UPDATE_LOG). There is
+# NO post-training backbone in the current plan.
+
+qualification_construction_driver:
+  name: glm            # GLM-5.3-Flash drives Study-A executable adequacy
+  model_id: glm-5.3-flash          # validation/cross-check AND Study-B
+  decoding: deterministic_or_low_temp   # drive-to-boundary construction
+  role: construction_and_adequacy_only  # NEVER selects tasks on later behavioral outcomes
+
+
+# ---- Runtime / environment (unchanged: Modal-hosted envs + evaluators) -----
+benchmark_runtime: modal            # Impossible-SWE + LHAW(MCP-Atlas) on Modal
+architecture: |
+  Model-agnostic trajectory runner:
+    benchmark env / task state -> observation -> model adapter -> action
+      -> environment step -> next observation
+  All models share one runner / logging / checkpointing path; only the model
+  adapter differs. (pp.runtimes.base.run_episode + pp.models backends.)
+
+# ---- Shared-endpoint concurrency policy (HARD upper bounds) ----------------
+# The workspace shared-endpoint concurrency limits are HARD caps. The runner
+# MUST hold a per-model semaphore strictly BELOW each cap. Cap values are
+# workspace-specific. Caps below are the RESOLVED workspace hard caps (16);
+# only the endpoint URL/identifier per model remains to be filled pre-run.
+shared_endpoint_concurrency:
+  policy: per_model_semaphore_below_cap
+  caps:                # RESOLVED workspace hard caps
+    glm: {hard_cap: 16, semaphore: 12}
+    qwen3_8_max: {hard_cap: 16, semaphore: 12}
+    kimi: {hard_cap: 16, semaphore: 12}
+  only_unresolved: endpoint_url_or_identifier
+  note: "semaphore < hard_cap for every shared-endpoint model; never exceed cap"
+
+# ---- Compute / cost ---------------------------------------------------------
+closed_api_hard_cap_usd: 300        # per T0.txt; unchanged

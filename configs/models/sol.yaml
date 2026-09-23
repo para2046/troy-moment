@@ -1,0 +1,82 @@
+# GPT-5.6 Sol (frontier). Exact model ID is a CONFIGURATION VALUE (spec §7).
+#
+# Reasoning + output length are set PER MODEL against THIS provider's contract.
+# They are NOT copied from any other roster model: GLM's truncation fix was
+# GLM-specific and no roster-wide shared max_tokens is imposed.
+name: sol
+backend: openai
+model_id: gpt-5.6-sol
+api_key_env: OPENAI_API_KEY
+pricing_key: gpt-5.6-sol
+
+# -- reasoning: NORMAL / provider default -------------------------------------
+# PROVENANCE: provider contract + measured. `reasoning_effort` is simply NOT
+# SENT, so the provider's own default tier applies. That default is a
+# reasoning-ON tier, established by differential measurement rather than
+# assumption: on an identical arithmetic prompt, omitting the parameter gave
+# reasoning_tokens=52, matching low=51 / medium=53 / high=53 and clearly
+# distinct from reasoning_effort='none' -> reasoning_tokens=0.
+# (Live-supported values on this model: 'none','low','medium','high','xhigh'.)
+# Not disabled, not maxed.
+# ALIGNED TO OFFICIAL. Official ImpossibleBench sets `effort=medium` for all
+# evaluation models. MEASURED on this model with the real v3 contract: at
+# effort none/low it spends ZERO reasoning tokens and returns no summary; from
+# medium up it reasons (49/68/79 tokens) and DOES return summary text
+# (443/468/460 chars). `provider_default` resolved to the no-reasoning end, so
+# the mediator was unobservable and near-absent.
+reasoning_setting: medium
+
+# -- temperature: OMITTED (not 0.0) -------------------------------------------
+# PROVENANCE: provider contract, verified live. temperature=0.0 is REJECTED:
+#   400 "Unsupported value: 'temperature' does not support 0.0 with this model.
+#        Only the default (1) value is supported."
+# `null` makes the backend omit the field entirely, which is the only valid
+# request shape. The previous `temperature: 0.0` would have hard-failed.
+temperature: null
+
+# -- output length: MODEL-SPECIFIC --------------------------------------------
+# PROVENANCE: provider contract, verified live. `max_tokens` is REJECTED:
+#   400 "Unsupported parameter: 'max_tokens' is not supported with this model.
+#        Use 'max_completion_tokens' instead."
+max_tokens_param: max_completion_tokens
+# PROVENANCE: Human Principal directive (headroom-first common INITIAL ceiling
+# of 65536) + LIVE provider acceptance + THIS model's own MULTI-TURN
+# measurement. 16384 -> 65536.
+#
+# Why the old number was not safe evidence: 16384 was derived from a
+# SINGLE-TURN peak of 87 completion tokens. Reasoning is billed INSIDE this
+# budget and its volume at provider-default effort is chosen by the provider,
+# so the ceiling has to absorb a joint reasoning+answer excursion, not a median.
+#
+# ACCEPTANCE (verified live through the real adapter path): 65536 accepted,
+# HTTP 200, finish_reason=stop. `max_tokens` is still REJECTED on this model,
+# so the ceiling can only travel as `max_completion_tokens`.
+#
+# MEASURED MULTI-TURN (scripts/profile_multiturn_budget.py, real run_episode
+# loop with a growing history; Study-A paired + Study-B forked-checkpoint
+# shapes): 31 model calls over 6 episodes (5.17 calls/episode), per-call output
+# max 2659 tokens (p50 88, p90 690), per-episode total max 3603, peak
+# reasoning_tokens 2481, 0 truncated calls, 0 empty-content calls, only
+# finish_reason=stop -> ~24.6x headroom over this model's own measured
+# multi-turn maximum (4.1% utilisation).
+# A high ceiling costs nothing unless consumed: billing is on tokens generated.
+max_tokens: 65536
+
+# LIVENESS GUARD (not an output limit). A 65536 ceiling removes TRUNCATION but
+# does not bound WALL-CLOCK: a GLM probe at 65536 was observed not returning
+# after ~25 min, while its gate call at the same ceiling returned in ~10.2 s.
+# Without this, one hung call stalls a whole run shard. It never truncates a
+# response - it fails the call so the runner records and retries it. 600 s is
+# ~60x the observed per-call latency. Set to null to disable explicitly.
+request_timeout_s: 600
+
+# --- transport: Responses API, for REASONING CAPTURE ---------------------
+# MEASURED: on /v1/chat/completions this model returns reasoning TOKEN COUNTS
+# but no reasoning text at all (reasoning_tokens=25, reasoning_text=None).
+# On /v1/responses with `reasoning.summary` it returns summarised reasoning
+# (measured 367 chars at "auto", 399 at "detailed"). Reasoning is the mediator
+# a crossing is read against, so the chat transport lost it entirely.
+# Truncation is normalised back to finish_reason="length" in the backend, so the
+# per-provider truncation detector is unchanged.
+use_responses_api: true
+reasoning_summary: detailed

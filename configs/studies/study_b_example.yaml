@@ -1,0 +1,11 @@
+# Example Study B config (spec §32.14). Replayed swarm; vary only the board.
+study: B
+model_config: configs/models/mock.yaml
+mock_policy: board_sensitive
+spec: data/generated_stimuli/stimuli.spec.json
+solvability: underspecified
+# pilot cells only, per spec §30; expand only after these work
+treatments: [B1_information_only, B2_observed_impunity, B3b_non_agent_source]
+seeds: 8
+max_turns: 10
+out: data/study_b/trajectories.jsonl

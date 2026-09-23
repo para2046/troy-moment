@@ -1,0 +1,43 @@
+# USD per 1M tokens. Update freely; never hard-code prices in model logic.
+# Values are PLACEHOLDERS and must be checked against current provider
+# pricing before any real spend.
+default_budget_usd: 5.00
+
+models:
+  mock-1:
+    input_per_mtok: 0.0
+    output_per_mtok: 0.0
+    notes: "offline backend; always free"
+
+  # --- closed / API (IDs are configuration, see configs/models/) ---
+  gpt-5.6-sol:
+    input_per_mtok: 1.25
+    cached_input_per_mtok: 0.125
+    output_per_mtok: 10.00
+    notes: "PLACEHOLDER - verify before spending"
+
+  claude-fable-5.1:
+    input_per_mtok: 3.00
+    cached_input_per_mtok: 0.30
+    output_per_mtok: 15.00
+    notes: "PLACEHOLDER - verify before spending"
+
+  gemini-3.8-flash:
+    input_per_mtok: 0.30
+    cached_input_per_mtok: 0.075
+    output_per_mtok: 2.50
+    notes: "PLACEHOLDER - verify before spending"
+
+  # --- open-weight, self-served: cost is GPU time, not per-token ---
+  glm-5.2:
+    input_per_mtok: 0.0
+    output_per_mtok: 0.0
+    notes: "self-hosted; track GPU-hours separately"
+  qwen3-32b:
+    input_per_mtok: 0.0
+    output_per_mtok: 0.0
+    notes: "self-hosted; track GPU-hours separately"
+  kimi-k2.5:
+    input_per_mtok: 0.0
+    output_per_mtok: 0.0
+    notes: "self-hosted; track GPU-hours separately"

@@ -1,0 +1,29 @@
+# Impossible-SWE runtime smoke config (SCREENING_OR_SMOKE_ONLY).
+# ONE shortlisted primary task; do NOT run the whole shortlist.
+name: impossible_smoke
+tag: SCREENING_OR_SMOKE_ONLY
+
+# Chosen primary task: pytest itself (pure-Python, `pip install -e .` is fast
+# and reliable on a CPU container -> cheapest task to stand up).
+instance_id: pytest-dev__pytest-10051
+
+raw_dir: data/candidates/impossible_raw
+snapshot_volume: impossible-swe-snapshots
+modal_app: impossible-swe-runtime
+
+# Modal container sizing for the smoke (CPU-only: clone + pip + pytest).
+cpu: 2.0
+memory_mb: 4096
+
+# Cost accounting: Modal's public CPU rate is ~$0.0000131 / physical-core-second
+# and ~$0.00000222 / GiB-second of memory (2024/2025 published pricing). Used to
+# estimate cost_usd from measured billed container-seconds; recorded as an
+# ESTIMATE in the results JSON.
+cost_cpu_core_sec_usd: 0.0000131
+cost_mem_gib_sec_usd: 0.00000222
+
+# Optional model->action->env loop demo turns via the Qwen3 Modal endpoint.
+run_episode_demo: false
+qwen_serving_name: qwen3_32b
+qwen_model_id: qwen3-32b
+episode_max_turns: 2

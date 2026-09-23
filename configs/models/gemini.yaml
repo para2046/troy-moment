@@ -1,0 +1,70 @@
+# Gemini 3.8 Flash — EVALUATION MODEL (roster slot 3).
+#
+# Replaces the two self-hosted Modal/vLLM open-weight models (glm, qwen3_8_max),
+# which were removed from the roster by human-principal decision after measurement.
+# See reports/ROSTER_CHANGE_2026_09_13.md.
+#
+# Settings below are set PER PROVIDER FROM MEASUREMENT, never copied from another
+# roster model. (The GLM truncation interaction is exactly why copying is forbidden:
+# its 65536 was set for a model that expands its reasoning to fill any ceiling, which
+# this model does not do.)
+name: gemini
+backend: gemini
+model_id: gemini-3.8-flash
+api_key_env: GOOGLE_API_KEY
+pricing_key: gemini-3.8-flash
+
+# Reasoning: the DIRECTED setting is the provider default — "normal/default
+# reasoning settings for all evaluation models". Not overridden here.
+#
+# MEASURED on the real A2 turn-0 prompt (system sha 2932b6d7fdcfdf7f, 947 ch;
+# observation sha a69ab7fabf9d0a08, 1735 ch), N=6, ceiling 65536:
+#     parseable        6/6
+#     output_tokens    43 – 57
+#     thinking_tokens  12 – 112
+#     wall-clock       1.9 – 4.3 s
+# For contrast, on the byte-identical prompt GLM-5.3 at the same ceiling produced
+# 59,579–65,536 output tokens over 223–269 s and was parseable 2/4. This model is
+# ~100x faster and three orders of magnitude cheaper in output tokens.
+reasoning_setting: provider_default
+
+# A thinking budget IS controllable on this model (`thinking_config.thinking_budget`
+# is accepted; verified live, and `budget=0` returns thinking_tokens≈241). It is
+# deliberately NOT set: measured thinking is 12–112 tokens, so there is nothing to
+# cap, and capping it would deviate from the directed default-reasoning policy.
+# Recorded because the knob's availability is the reason no knob is needed.
+#   NOTE: gemini-3.1-pro-preview REJECTS budget=0 with
+#   "Budget 0 is invalid. This model only works in thinking mode." and returned
+#   0/2 parseable with content_chars=0 on this prompt — it is NOT usable here.
+
+temperature: 0.7        # matches the roster's sampling temperature for non-reasoning
+                        # -restricted providers; this model accepts it.
+
+# Output ceiling: the directed common initial value, 65536. Accepted by the API and
+# never approached — the observed maximum was 57 output tokens, i.e. 0.09% of the
+# ceiling. Retained rather than lowered so the ceiling is uniform across the roster
+# wherever the provider permits it, and because there is no truncation to prevent.
+max_tokens: 65536
+
+# LIVENESS GUARD (not an output limit), same rationale as the rest of the roster:
+# a large ceiling removes truncation but does not bound wall-clock, and one hung
+# call must not stall a shard. Measured wall-clock here is 1.9–4.3 s, so 600 s is
+# ~140x headroom and will only ever fire on a genuine hang.
+request_timeout_s: 600
+
+# TRUNCATION SIGNAL, per provider — this model's is `MAX_TOKENS`, NOT `length`.
+# It also reports `MALFORMED_FUNCTION_CALL` on COMPLETE, VALID responses: measured
+# 5 of 6 healthy calls, caused by a trailing empty content part. The prompt names
+# run_tests/apply_patch in prose without declaring them through this provider's
+# native `tools` parameter, so its function-calling path half-triggers on a tool it
+# was never given. Classified as benign in
+# `pp.models.base.BENIGN_FINISH_SIGNALS`; treating any non-STOP value as failure
+# would have discarded most of this model's working output.
+
+# --- reasoning, ALIGNED TO OFFICIAL --------------------------------------
+# Official ImpossibleBench sets `reasoning_tokens=4096`. This provider has no
+# `effort` parameter; its equivalent knob is `thinking_config.thinking_budget`,
+# so 4096 is the direct mapping. MEASURED: budget unset -> 1153 thinking tokens
+# / 2936 thought chars; budget 4096 -> 1192 / 3421. A budget of 0 is rejected
+# outright by this model, which is why none was sent before.
+thinking_budget: 4096

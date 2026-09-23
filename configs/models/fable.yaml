@@ -1,0 +1,82 @@
+# Claude Fable 5.1 (frontier).
+#
+# Reasoning + output length are set PER MODEL against THIS provider's contract
+# and against FABLE's own limits -- not GLM's, and not a roster-wide number.
+name: fable
+backend: anthropic
+model_id: claude-fable-5.1
+served_model_name: claude-fable-5-1   # real Anthropic id (model_id stays friendly claude-fable-5.1)
+api_key_env: ANTHROPIC_API_KEY
+pricing_key: claude-fable-5.1
+
+# -- reasoning: NORMAL / provider default -------------------------------------
+# PROVENANCE: provider contract, verified live against the Models API and by
+# probe. On this model thinking is ALWAYS ON and `adaptive` is the only on-mode:
+#   Models API capabilities.thinking -> {adaptive: supported, enabled: NOT supported}
+#   thinking={"type":"enabled","budget_tokens":N} -> 400 (legacy fixed budget
+#       removed; this is what the old backend sent)
+#   thinking={"type":"disabled"}                  -> 400 (cannot be turned off)
+# So `adaptive` IS the provider default, stated explicitly. Depth is left at the
+# provider's own default effort -- `reasoning_effort` is deliberately NOT set,
+# so no effort tier is sent and nothing is pushed to a maximum.
+reasoning_setting: adaptive
+# `display` controls VISIBILITY only -- thinking happens and is billed
+# identically under every setting -- so this makes reasoning OBSERVABLE without
+# changing its depth. Required here for two reasons: (1) the smoke must observe
+# reasoning rather than assume it, and (2) the default "omitted" returns thinking
+# blocks whose text is empty, which would leave the runners' reasoning-as-mediator
+# trace blank for this model.
+reasoning_display: summarized
+
+# -- temperature: OMITTED (not 0.0) -------------------------------------------
+# PROVENANCE: provider contract, verified live. The sampling parameters were
+# removed from this provider's Messages API -- the SDK does not even accept the
+# keyword (`Messages.create() got an unexpected keyword argument 'temperature'`),
+# so the previous `temperature: 0.0` was an unconditional TypeError on every
+# call. Behaviour is steered by prompt + thinking, not by temperature.
+temperature: null
+
+# -- output length: MODEL-SPECIFIC --------------------------------------------
+# PROVENANCE: provider contract + measured smoke. This provider's `max_tokens`
+# INCLUDES thinking tokens, so the ceiling is a joint budget for the thinking
+# trace AND the action JSON. Fable 5.1's own published ceiling is 128000
+# (Models API max_tokens), so this sits well inside the model's real limit.
+# PROVENANCE: Human Principal directive (headroom-first common INITIAL ceiling
+# of 65536) + LIVE provider acceptance on THIS model. 12288 -> 65536.
+#
+# Why the old number was not safe evidence: 12288 was derived from a
+# SINGLE-TURN peak of 381 output tokens, and on this provider `max_tokens` is a
+# JOINT budget for the adaptive thinking trace AND the action JSON, so a hard
+# multi-turn turn can expand the trace until it crowds out the final action.
+#
+# ACCEPTANCE (verified live): the Models API reports max_tokens: 128000 for
+# claude-fable-5-1, so 65536 is inside the model's OWN output limit. The
+# provider SDK additionally refuses a NON-streaming request whose max_tokens
+# implies a >10-minute generation:
+#   ValueError: "Streaming is required for operations that may take longer than
+#                10 minutes."
+# That guard is `3600 * max_tokens / 128000 > 600`, i.e. it trips at
+# max_tokens >= 21334 (verified live: 65536/49152/32768/21334 refused
+# non-streaming, 21333 accepted). It is a CLIENT-SIDE TIMEOUT threshold, not an
+# output limit, and the provider's own documented remedy is to stream -- so
+# `pp.models.api_backends.AnthropicBackend` now streams above 21333 and
+# reassembles the final Message (identical content blocks, usage and
+# stop_reason). 65536 then verifies accepted: HTTP 200, stop_reason=end_turn.
+# This is therefore NOT a clamp; the ceiling is the directed value.
+#
+# MULTI-TURN measurement for THIS model: not_profiled_at_64k -- the ticket was
+# scope-cut to the acceptance probe before Fable's episode profile ran. The
+# ceiling rests on (a) the directed policy value, (b) verified provider
+# acceptance above, and (c) the worst case observed anywhere on the roster
+# (13188 output tokens on a successful multi-turn call), which 65536 covers
+# ~5x over. Recorded honestly in data/frozen/model_output_config.json rather
+# than back-filled with a distribution that was never measured.
+max_tokens: 65536
+
+# LIVENESS GUARD (not an output limit). A 65536 ceiling removes TRUNCATION but
+# does not bound WALL-CLOCK: a GLM probe at 65536 was observed not returning
+# after ~25 min, while its gate call at the same ceiling returned in ~10.2 s.
+# Without this, one hung call stalls a whole run shard. It never truncates a
+# response - it fails the call so the runner records and retries it. 600 s is
+# ~60x the observed per-call latency. Set to null to disable explicitly.
+request_timeout_s: 600

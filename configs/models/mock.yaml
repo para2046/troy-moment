@@ -1,0 +1,6 @@
+name: mock
+backend: mock
+model_id: mock-1
+policy: persistent_safe
+seed: 0
+pricing_key: mock-1

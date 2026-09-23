@@ -1,0 +1,10 @@
+# Example Study A config (spec §32.13). Persistence calibration, no peers.
+study: A
+model_config: configs/models/mock.yaml
+mock_policy: persistent_safe
+solvabilities: [solvable, difficult_solvable, underspecified, impossible]
+seeds: 3
+escalation_available: true
+max_turns: 12
+out: data/study_a/trajectories.jsonl
+checkpoints_out: data/checkpoints/study_a.jsonl
